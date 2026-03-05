@@ -9,6 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEXUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DB_FILE="${NEXUS_ROOT}/nexus.db"
 
 # ── Defaults ────────────────────────────────────────────────
 MODE=""
@@ -72,11 +73,11 @@ if [[ -z "${PROMPT}" ]]; then
 fi
 
 # ── Check required tools ───────────────────────────────────
-if ! command -v jq &>/dev/null; then
-  echo "Error: jq is required but not installed." >&2; exit 1
-fi
 if ! command -v codex &>/dev/null; then
   echo "Error: codex CLI is required but not installed." >&2; exit 1
+fi
+if ! command -v jq &>/dev/null && [[ "${DRY_RUN}" != true ]]; then
+  echo "Error: jq is required but not installed." >&2; exit 1
 fi
 
 # ── Read config ─────────────────────────────────────────────
@@ -113,13 +114,14 @@ ${CONVENTIONS}
 fi
 
 # [RELEVANT KNOWLEDGE]
-KNOWLEDGE_FILE="${NEXUS_ROOT}/context/knowledge.jsonl"
-if [[ -f "${KNOWLEDGE_FILE}" && -s "${KNOWLEDGE_FILE}" ]]; then
-  KNOWLEDGE="$(cat "${KNOWLEDGE_FILE}")"
-  ENRICHED_PROMPT+="[RELEVANT KNOWLEDGE]
+if [[ -f "${DB_FILE}" ]]; then
+  KNOWLEDGE="$(sqlite3 "${DB_FILE}" "SELECT json_object('id',id,'type',type,'fact',fact,'recommendation',recommendation,'confidence',confidence,'source',source,'tags',json(tags),'files',json(files),'timestamp',created_at) FROM knowledge WHERE expires_at IS NULL OR expires_at > datetime('now');" 2>/dev/null || true)"
+  if [[ -n "${KNOWLEDGE}" ]]; then
+    ENRICHED_PROMPT+="[RELEVANT KNOWLEDGE]
 ${KNOWLEDGE}
 
 "
+  fi
 fi
 
 # [TASK]
@@ -195,79 +197,34 @@ fi
 END_TS="$(date +%s)"
 DURATION=$(( END_TS - START_TS ))
 
-# ── Detect changed files ───────────────────────────────────
+# ── Detect changed files
 FILES_CHANGED="[]"
 if command -v git &>/dev/null && git -C "${DIR}" rev-parse --git-dir &>/dev/null && git -C "${DIR}" rev-parse --verify HEAD &>/dev/null; then
   FILES_CHANGED="$(git -C "${DIR}" diff --name-only HEAD 2>/dev/null | jq -R -s 'split("\n") | map(select(length > 0))')" || FILES_CHANGED="[]"
 fi
 
-# ── Log to dispatches.jsonl ─────────────────────────────────
-DISPATCHES_LOG="${NEXUS_ROOT}/logs/dispatches.jsonl"
-PROMPT_SUMMARY="$(echo "${PROMPT}" | cut -c1-100)"
-DISPATCH_ID="d-${TASK_ID}-$(date +%s)"
-
-DISPATCH_ENTRY="$(jq -c -n \
-  --arg id "${DISPATCH_ID}" \
-  --arg timestamp "${START_ISO}" \
-  --arg taskId "${TASK_ID}" \
-  --arg mode "${MODE}" \
-  --arg model "${MODEL}" \
-  --arg prompt_summary "${PROMPT_SUMMARY}" \
-  --argjson duration_seconds "${DURATION}" \
-  --argjson exit_code "${EXIT_CODE}" \
-  --argjson files_changed "${FILES_CHANGED}" \
-  '{
-    id: $id,
-    timestamp: $timestamp,
-    taskId: $taskId,
-    mode: $mode,
-    model: $model,
-    prompt_summary: $prompt_summary,
-    duration_seconds: $duration_seconds,
-    exit_code: $exit_code,
-    files_changed: $files_changed,
-    validated: false,
-    reviewed_by: null,
-    review_result: null
-  }'
-)"
-
-echo "${DISPATCH_ENTRY}" >> "${DISPATCHES_LOG}"
-
-# ── Update usage.json ───────────────────────────────────────
-USAGE_FILE="${NEXUS_ROOT}/logs/usage.json"
-TODAY="$(date +%Y-%m-%d)"
-
-if [[ ! -f "${USAGE_FILE}" ]]; then
-  echo '{"total_dispatches":0,"total_duration_seconds":0,"by_mode":{},"by_model":{},"session_history":[]}' > "${USAGE_FILE}"
+# ── Detect failure type
+FAILURE_TYPE=""
+if [[ "${EXIT_CODE}" -ne 0 ]]; then
+  if [[ "${DURATION}" -ge "${TIMEOUT}" ]]; then
+    FAILURE_TYPE="timeout"
+  elif [[ ! -s "${OUTPUT_FILE}" ]]; then
+    FAILURE_TYPE="crash"
+  fi
 fi
 
-UPDATED_USAGE="$(jq \
-  --arg mode "${MODE}" \
-  --arg model "${MODEL}" \
-  --argjson duration "${DURATION}" \
-  --arg today "${TODAY}" \
-  '
-  .total_dispatches += 1 |
-  .total_duration_seconds += $duration |
-  .by_mode[$mode] = ((.by_mode[$mode] // 0) + 1) |
-  .by_model[$model] = ((.by_model[$model] // 0) + 1) |
-  (
-    if (.session_history | map(select(.date == $today)) | length) > 0 then
-      .session_history |= map(
-        if .date == $today then
-          .dispatches += 1 | .duration_seconds += $duration
-        else . end
-      )
-    else
-      .session_history += [{"date": $today, "dispatches": 1, "duration_seconds": $duration}]
-    end
-  )
-  ' "${USAGE_FILE}"
-)"
+# ── Log to SQLite
+PROMPT_SUMMARY="$(echo "${PROMPT}" | cut -c1-100 | sed "s/'/''/g")"
+DISPATCH_ID="d-${TASK_ID}-$(date +%s)"
+TODAY="$(date +%Y-%m-%d)"
 
-USAGE_TMP="$(mktemp "${NEXUS_ROOT}/logs/.usage.json.XXXXXX")"
-echo "${UPDATED_USAGE}" > "${USAGE_TMP}" && mv "${USAGE_TMP}" "${USAGE_FILE}"
+if [[ -f "${DB_FILE}" ]] && command -v sqlite3 &>/dev/null; then
+  sqlite3 "${DB_FILE}" "INSERT INTO dispatches (id, timestamp, task_id, mode, model, backend, prompt_summary, duration_seconds, exit_code, failure_type, files_changed, validated) VALUES ('${DISPATCH_ID}', '${START_ISO}', '${TASK_ID}', '${MODE}', '${MODEL}', 'shell', '${PROMPT_SUMMARY}', ${DURATION}, ${EXIT_CODE}, $(if [[ -n "${FAILURE_TYPE}" ]]; then echo "'${FAILURE_TYPE}'"; else echo "NULL"; fi), '${FILES_CHANGED}', 0);"
+
+  sqlite3 "${DB_FILE}" "INSERT OR REPLACE INTO usage (date, dispatches, duration_seconds) VALUES ('${TODAY}', COALESCE((SELECT dispatches FROM usage WHERE date='${TODAY}'),0)+1, COALESCE((SELECT duration_seconds FROM usage WHERE date='${TODAY}'),0)+${DURATION});"
+
+  sqlite3 "${DB_FILE}" "INSERT INTO events (timestamp, event_type, task_id, agent, payload) VALUES ('${START_ISO}', 'dispatched', '${TASK_ID}', 'codex', json_object('dispatch_id','${DISPATCH_ID}','mode','${MODE}','duration',${DURATION},'exit_code',${EXIT_CODE}));"
+fi
 
 # ── Summary ─────────────────────────────────────────────────
 echo ""

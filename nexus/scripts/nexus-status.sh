@@ -2,6 +2,7 @@
 set -euo pipefail
 
 NEXUS_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DB_FILE="${NEXUS_ROOT}/nexus.db"
 
 echo "╔══════════════════════════════════════════╗"
 echo "║            N E X U S  STATUS             ║"
@@ -14,22 +15,21 @@ echo ""
 
 # Usage
 echo "=== Codex Usage ==="
-USAGE="$NEXUS_ROOT/logs/usage.json"
-if [[ -f "$USAGE" ]]; then
-  DISPATCHES=$(jq '.total_dispatches' "$USAGE")
-  DURATION=$(jq '.total_duration_seconds' "$USAGE")
-  echo "Total dispatches: $DISPATCHES"
-  echo "Total time: ${DURATION}s"
-  if [[ "$DISPATCHES" -gt 0 ]]; then
+if [[ -f "$DB_FILE" ]]; then
+  TOTAL_DISPATCHES="$(sqlite3 "$DB_FILE" "SELECT COALESCE(SUM(dispatches),0) FROM usage;")"
+  TOTAL_DURATION="$(sqlite3 "$DB_FILE" "SELECT COALESCE(SUM(duration_seconds),0) FROM usage;")"
+  echo "Total dispatches: $TOTAL_DISPATCHES"
+  echo "Total time: ${TOTAL_DURATION}s"
+  if [[ "$TOTAL_DISPATCHES" -gt 0 ]]; then
     echo ""
     echo "By mode:"
-    jq -r '.by_mode | to_entries[] | "  \(.key): \(.value)"' "$USAGE" 2>/dev/null || true
+    sqlite3 "$DB_FILE" "SELECT '  ' || mode || ': ' || COUNT(*) FROM dispatches GROUP BY mode;" 2>/dev/null || true
     echo ""
     echo "By model:"
-    jq -r '.by_model | to_entries[] | "  \(.key): \(.value)"' "$USAGE" 2>/dev/null || true
+    sqlite3 "$DB_FILE" "SELECT '  ' || model || ': ' || COUNT(*) FROM dispatches GROUP BY model;" 2>/dev/null || true
     echo ""
     echo "Session history:"
-    jq -r '.session_history[] | "  \(.date): \(.dispatches) dispatches, \(.duration_seconds)s"' "$USAGE" 2>/dev/null || true
+    sqlite3 "$DB_FILE" "SELECT '  ' || date || ': ' || dispatches || ' dispatches, ' || duration_seconds || 's' FROM usage ORDER BY date DESC LIMIT 5;" 2>/dev/null || true
   fi
 else
   echo "No usage data yet."
@@ -38,23 +38,46 @@ echo ""
 
 # Knowledge
 echo "=== Knowledge Base ==="
-KB="$NEXUS_ROOT/context/knowledge.jsonl"
-if [[ -s "$KB" ]]; then
-  TOTAL=$(wc -l < "$KB" | tr -d ' ')
+if [[ -f "$DB_FILE" ]]; then
+  TOTAL="$(sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM knowledge WHERE expires_at IS NULL OR expires_at > datetime('now');")"
   echo "Entries: $TOTAL"
-  echo ""
-  echo "By type:"
-  jq -r '.type' "$KB" | sort | uniq -c | sort -rn | sed 's/^/  /'
+  if [[ "$TOTAL" -gt 0 ]]; then
+    echo ""
+    echo "By type:"
+    sqlite3 "$DB_FILE" "SELECT '  ' || type || ': ' || COUNT(*) FROM knowledge WHERE expires_at IS NULL OR expires_at > datetime('now') GROUP BY type ORDER BY COUNT(*) DESC;" 2>/dev/null || true
+  fi
 else
   echo "Entries: 0 (empty)"
 fi
 echo ""
 
+# Failure Taxonomy (NEW)
+echo "=== Failure Taxonomy ==="
+if [[ -f "$DB_FILE" ]]; then
+  FAILURES="$(sqlite3 "$DB_FILE" "SELECT failure_type, COUNT(*) FROM dispatches WHERE failure_type IS NOT NULL GROUP BY failure_type ORDER BY COUNT(*) DESC;" 2>/dev/null || true)"
+  if [[ -n "$FAILURES" ]]; then
+    echo "$FAILURES" | while IFS='|' read -r ftype fcount; do
+      echo "  ${ftype}: ${fcount}"
+    done
+  else
+    echo "  (no failures recorded)"
+  fi
+else
+  echo "  (no data)"
+fi
+echo ""
+
 # Recent Dispatches
 echo "=== Recent Dispatches (last 5) ==="
-DISPATCHES_LOG="$NEXUS_ROOT/logs/dispatches.jsonl"
-if [[ -s "$DISPATCHES_LOG" ]]; then
-  tail -5 "$DISPATCHES_LOG" | jq -r '"  \(.taskId) [\(.mode)] \(.duration_seconds)s exit:\(.exit_code) — \(.prompt_summary)"'
+if [[ -f "$DB_FILE" ]]; then
+  RECENT="$(sqlite3 "$DB_FILE" "SELECT task_id, mode, duration_seconds, exit_code, prompt_summary FROM dispatches ORDER BY timestamp DESC LIMIT 5;" 2>/dev/null || true)"
+  if [[ -n "$RECENT" ]]; then
+    echo "$RECENT" | while IFS='|' read -r tid dmode ddur dexit dprompt; do
+      echo "  ${tid} [${dmode}] ${ddur}s exit:${dexit} — ${dprompt}"
+    done
+  else
+    echo "  (none yet)"
+  fi
 else
   echo "  (none yet)"
 fi
