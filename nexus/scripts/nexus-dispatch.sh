@@ -172,7 +172,14 @@ START_TS="$(date +%s)"
 START_ISO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 EXIT_CODE=0
-echo "${ENRICHED_PROMPT}" | timeout "${TIMEOUT}" "${CODEX_CMD[@]}" || EXIT_CODE=$?
+# Use gtimeout (coreutils) if available, otherwise run without timeout
+if command -v gtimeout &>/dev/null; then
+  echo "${ENRICHED_PROMPT}" | gtimeout "${TIMEOUT}" "${CODEX_CMD[@]}" || EXIT_CODE=$?
+elif command -v timeout &>/dev/null; then
+  echo "${ENRICHED_PROMPT}" | timeout "${TIMEOUT}" "${CODEX_CMD[@]}" || EXIT_CODE=$?
+else
+  echo "${ENRICHED_PROMPT}" | "${CODEX_CMD[@]}" || EXIT_CODE=$?
+fi
 
 END_TS="$(date +%s)"
 DURATION=$(( END_TS - START_TS ))
@@ -188,7 +195,7 @@ DISPATCHES_LOG="${NEXUS_ROOT}/logs/dispatches.jsonl"
 PROMPT_SUMMARY="$(echo "${PROMPT}" | cut -c1-100)"
 DISPATCH_ID="d-${TASK_ID}-$(date +%s)"
 
-DISPATCH_ENTRY="$(jq -n \
+DISPATCH_ENTRY="$(jq -c -n \
   --arg id "${DISPATCH_ID}" \
   --arg timestamp "${START_ISO}" \
   --arg taskId "${TASK_ID}" \

@@ -29,7 +29,7 @@ if [[ -f "$USAGE" ]]; then
     jq -r '.by_model | to_entries[] | "  \(.key): \(.value)"' "$USAGE" 2>/dev/null || true
     echo ""
     echo "Session history:"
-    jq -r '.session_history[] | "  \(.date): \(.dispatches) dispatches, \(.duration)s"' "$USAGE" 2>/dev/null || true
+    jq -r '.session_history[] | "  \(.date): \(.dispatches) dispatches, \(.duration_seconds)s"' "$USAGE" 2>/dev/null || true
   fi
 else
   echo "No usage data yet."

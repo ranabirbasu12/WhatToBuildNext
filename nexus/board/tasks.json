@@ -1,4 +1,25 @@
 {
   "version": 1,
-  "tasks": []
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Add unit tests for greet function",
+      "description": "Create test_hello.py with pytest tests",
+      "assignee": "codex",
+      "priority": 1,
+      "status": "done",
+      "depends": [],
+      "mode": "worker",
+      "parent": null,
+      "reviewedBy": "claude",
+      "reviewStatus": "approved",
+      "retryCount": 0,
+      "notes": [
+        "Validated: all 3 test cases pass. Codex inspected source before writing tests — good behavior."
+      ],
+      "subtasks": [],
+      "createdAt": "2026-03-05T12:28:48Z",
+      "completedAt": "2026-03-05T12:30:37Z"
+    }
+  ]
 }
