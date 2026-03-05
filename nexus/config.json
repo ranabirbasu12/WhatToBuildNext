@@ -1,0 +1,25 @@
+{
+  "codex": {
+    "model": "gpt-5.3-codex",
+    "defaultMode": "worker",
+    "fullAuto": true,
+    "multiAgent": true,
+    "maxRetries": 3,
+    "timeoutSeconds": 300
+  },
+  "routing": {
+    "autoDispatchThreshold": "medium",
+    "alwaysReview": true,
+    "humanEscalationTriggers": [
+      "architecture_decision",
+      "security_boundary",
+      "schema_change",
+      "agent_disagreement",
+      "three_failures"
+    ]
+  },
+  "tracking": {
+    "logDispatches": true,
+    "logUsage": true
+  }
+}
