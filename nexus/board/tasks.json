@@ -69,19 +69,21 @@
       "description": "Create nexus/tests/test-nexus.sh — automated test suite for board, knowledge, dispatch (dry-run), and status scripts",
       "assignee": "codex",
       "priority": 2,
-      "status": "pending",
+      "status": "done",
       "depends": [
         "T003"
       ],
       "mode": "worker",
       "parent": null,
-      "reviewedBy": null,
-      "reviewStatus": "pending",
+      "reviewedBy": "claude",
+      "reviewStatus": "approved",
       "retryCount": 0,
-      "notes": [],
+      "notes": [
+        "4/4 tests passing. Codex created stub codex binary for isolation, fixed its own JSON assertion bug. Independently validated."
+      ],
       "subtasks": [],
       "createdAt": "2026-03-05T12:38:47Z",
-      "completedAt": null
+      "completedAt": "2026-03-05T12:47:51Z"
     },
     {
       "id": "T005",
@@ -89,17 +91,19 @@
       "description": "Update the living doc with architecture, known issues, and integration test findings",
       "assignee": "claude",
       "priority": 2,
-      "status": "pending",
+      "status": "done",
       "depends": [],
       "mode": "worker",
       "parent": null,
-      "reviewedBy": null,
-      "reviewStatus": "pending",
+      "reviewedBy": "claude",
+      "reviewStatus": "approved",
       "retryCount": 0,
-      "notes": [],
+      "notes": [
+        "Updated project-state.md with full v0.1 architecture, proven workflows, and known issues"
+      ],
       "subtasks": [],
       "createdAt": "2026-03-05T12:38:47Z",
-      "completedAt": null
+      "completedAt": "2026-03-05T12:48:26Z"
     }
   ]
 }
