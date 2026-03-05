@@ -3,6 +3,7 @@ set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_SCRIPTS_DIR="$(cd "${TEST_DIR}/../scripts" && pwd)"
+SOURCE_SCHEMA="$(cd "${TEST_DIR}/.." && pwd)/schema.sql"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -39,19 +40,21 @@ setup_test_env() {
   TMP_ROOT="$(mktemp -d)"
   TEST_NEXUS_ROOT="${TMP_ROOT}/nexus"
 
-  mkdir -p "${TEST_NEXUS_ROOT}/scripts" "${TEST_NEXUS_ROOT}/board" "${TEST_NEXUS_ROOT}/context" "${TEST_NEXUS_ROOT}/logs" "${TMP_ROOT}/bin" "${TMP_ROOT}/work"
+  mkdir -p "${TEST_NEXUS_ROOT}/scripts" \
+           "${TEST_NEXUS_ROOT}/context" \
+           "${TEST_NEXUS_ROOT}/logs" \
+           "${TMP_ROOT}/bin" \
+           "${TMP_ROOT}/work"
 
+  # Copy scripts
   cp "${SOURCE_SCRIPTS_DIR}"/*.sh "${TEST_NEXUS_ROOT}/scripts/"
   chmod +x "${TEST_NEXUS_ROOT}/scripts/"*.sh
 
-  cat > "${TEST_NEXUS_ROOT}/board/tasks.json" <<'JSON'
-{
-  "tasks": []
-}
-JSON
+  # Copy schema and initialize SQLite db
+  cp "${SOURCE_SCHEMA}" "${TEST_NEXUS_ROOT}/schema.sql"
+  sqlite3 "${TEST_NEXUS_ROOT}/nexus.db" < "${TEST_NEXUS_ROOT}/schema.sql"
 
-  : > "${TEST_NEXUS_ROOT}/context/knowledge.jsonl"
-
+  # Context fixtures
   cat > "${TEST_NEXUS_ROOT}/context/project-state.md" <<'MD'
 # Test Project State
 Test project context from fixture.
@@ -62,27 +65,18 @@ MD
 - fixture convention
 MD
 
+  # Config fixture
   cat > "${TEST_NEXUS_ROOT}/config.json" <<'JSON'
 {
   "codex": {
     "model": "gpt-5.3-codex",
-    "timeoutSeconds": 60
+    "timeoutSeconds": 60,
+    "dispatchBackend": "shell"
   }
 }
 JSON
 
-  cat > "${TEST_NEXUS_ROOT}/logs/usage.json" <<'JSON'
-{
-  "total_dispatches": 0,
-  "total_duration_seconds": 0,
-  "by_mode": {},
-  "by_model": {},
-  "session_history": []
-}
-JSON
-
-  : > "${TEST_NEXUS_ROOT}/logs/dispatches.jsonl"
-
+  # Stub codex binary
   cat > "${TMP_ROOT}/bin/codex" <<'SH'
 #!/usr/bin/env bash
 echo "stub codex"
@@ -103,72 +97,103 @@ run_test() {
   fi
 }
 
+# ── Test 1: DB initialization ─────────────────────────────────
+
+test_db_init() {
+  local tables
+  tables="$(sqlite3 "${TEST_NEXUS_ROOT}/nexus.db" ".tables")"
+
+  assert_contains "${tables}" "dispatches" || return 1
+  assert_contains "${tables}" "events" || return 1
+  assert_contains "${tables}" "knowledge" || return 1
+  assert_contains "${tables}" "tasks" || return 1
+  assert_contains "${tables}" "usage" || return 1
+}
+
+# ── Test 2: Board flow ────────────────────────────────────────
+
 test_board_flow() {
   local board="${TEST_NEXUS_ROOT}/scripts/nexus-board.sh"
-
+  local db="${TEST_NEXUS_ROOT}/nexus.db"
   local out
+
+  # Add a task
   out="$("${board}" add --title "Build tests" --desc "Create automated tests" --assignee codex --priority 2 --mode reviewer)"
   assert_contains "${out}" "Created task T001" || return 1
 
+  # Verify with list
   out="$("${board}" list)"
   assert_contains "${out}" "T001 [pending] [codex] Build tests" || return 1
 
+  # Update status to in_progress
   out="$("${board}" update --id T001 --status in_progress)"
   assert_contains "${out}" "Updated task T001" || return 1
 
+  # Verify with show
   out="$("${board}" show --id T001)"
   assert_contains "${out}" '"id": "T001"' || return 1
   assert_contains "${out}" '"status": "in_progress"' || return 1
 
-  out="$("${board}" summary)"
-  assert_contains "${out}" "In Progress: 1" || return 1
-
+  # Add a note
   "${board}" update --id T001 --note "needs follow-up" >/dev/null
-  "${board}" update --id T001 --retry >/dev/null
-
   local notes
-  notes="$(jq -r '.tasks[] | select(.id=="T001") | .notes[0]' "${TEST_NEXUS_ROOT}/board/tasks.json")"
-  [[ "${notes}" == "needs follow-up" ]] || return 1
+  notes="$(sqlite3 "${db}" "SELECT notes FROM tasks WHERE id = 'T001';")"
+  assert_contains "${notes}" "needs follow-up" || return 1
 
+  # Retry
+  "${board}" update --id T001 --retry >/dev/null
   local retry_count
-  retry_count="$(jq -r '.tasks[] | select(.id=="T001") | .retryCount' "${TEST_NEXUS_ROOT}/board/tasks.json")"
+  retry_count="$(sqlite3 "${db}" "SELECT retry_count FROM tasks WHERE id = 'T001';")"
   [[ "${retry_count}" == "1" ]] || return 1
 
+  # Mark done
   "${board}" update --id T001 --status done >/dev/null
   local completed
-  completed="$(jq -r '.tasks[] | select(.id=="T001") | .completedAt' "${TEST_NEXUS_ROOT}/board/tasks.json")"
-  [[ "${completed}" != "null" ]] || return 1
+  completed="$(sqlite3 "${db}" "SELECT completed_at FROM tasks WHERE id = 'T001';")"
+  [[ -n "${completed}" && "${completed}" != "" ]] || return 1
+
+  # Summary
+  out="$("${board}" summary)"
+  assert_contains "${out}" "Done: 1" || return 1
 }
+
+# ── Test 3: Knowledge flow ────────────────────────────────────
 
 test_knowledge_flow() {
   local kb="${TEST_NEXUS_ROOT}/scripts/nexus-knowledge.sh"
   local out
 
+  # Add entry with all fields
   out="$("${kb}" add --type gotcha --fact "Fixture fact" --rec "Fixture recommendation" --confidence high --source codex --tags "testing,nexus" --files "nexus/scripts/nexus-board.sh")"
   assert_contains "${out}" "Added k_001" || return 1
 
+  # Search by tags
   out="$("${kb}" search --tags testing)"
-  assert_contains "${out}" 'Fixture fact' || return 1
+  assert_contains "${out}" "Fixture fact" || return 1
 
+  # Search by type
   out="$("${kb}" search --type gotcha)"
-  assert_contains "${out}" '"type": "gotcha"' || return 1
+  assert_contains "${out}" '"type":"gotcha"' || return 1
 
+  # Prime output format
   out="$("${kb}" prime --tags nexus --max 5)"
   assert_contains "${out}" "- [gotcha] Fixture fact -> Fixture recommendation" || return 1
 
+  # Stats
   out="$("${kb}" stats)"
   assert_contains "${out}" "Total entries: 1" || return 1
   assert_contains "${out}" "gotcha" || return 1
 }
 
+# ── Test 4: Dispatch dry-run ──────────────────────────────────
+
 test_dispatch_dry_run() {
   local dispatch="${TEST_NEXUS_ROOT}/scripts/nexus-dispatch.sh"
+  local db="${TEST_NEXUS_ROOT}/nexus.db"
   local out
 
-  # Seed one knowledge entry so [RELEVANT KNOWLEDGE] is present.
-  cat > "${TEST_NEXUS_ROOT}/context/knowledge.jsonl" <<'JSONL'
-{"id":"k_001","type":"pattern","fact":"Dispatch fixture","recommendation":"Use dry run","confidence":"high","source":"claude","tags":["dispatch"],"files":[],"timestamp":"2026-03-05T00:00:00Z"}
-JSONL
+  # Seed a knowledge entry directly in SQLite
+  sqlite3 "${db}" "INSERT INTO knowledge (id, type, fact, recommendation, confidence, source, tags, files, created_at) VALUES ('k_dispatch', 'pattern', 'Dispatch fixture', 'Use dry run', 'high', 'claude', '[\"dispatch\"]', '[]', '2026-03-05T00:00:00Z');"
 
   out="$("${dispatch}" --mode worker --task-id T999 --prompt "Validate enriched prompt" --dir "${TMP_ROOT}/work" --dry-run)"
 
@@ -182,6 +207,8 @@ JSONL
   assert_contains "${out}" "Dry run complete. No execution performed." || return 1
 }
 
+# ── Test 5: Status dashboard ─────────────────────────────────
+
 test_status_runs() {
   local status_script="${TEST_NEXUS_ROOT}/scripts/nexus-status.sh"
   local out
@@ -191,15 +218,102 @@ test_status_runs() {
   assert_contains "${out}" "=== Nexus Task Board ===" || return 1
   assert_contains "${out}" "=== Codex Usage ===" || return 1
   assert_contains "${out}" "=== Knowledge Base ===" || return 1
+  assert_contains "${out}" "=== Failure Taxonomy ===" || return 1
 }
+
+# ── Test 6: Reflect extract ──────────────────────────────────
+
+test_reflect_extract() {
+  local reflect="${TEST_NEXUS_ROOT}/scripts/nexus-reflect.sh"
+  local db="${TEST_NEXUS_ROOT}/nexus.db"
+  local out
+
+  # Add a task to db first
+  sqlite3 "${db}" "INSERT INTO tasks (id, title, description, assignee, priority, status, mode, retry_count, depends, notes, created_at) VALUES ('T100', 'Reflect test task', 'Task for reflect testing', 'codex', 1, 'done', 'worker', 0, '[]', '[]', '2026-03-05T00:00:00Z');"
+
+  # Run reflect extract
+  out="$("${reflect}" extract --task-id T100 --outcome success --fact "Tests should seed SQLite directly" --type pattern --rec "Use INSERT statements" --confidence high --tags "testing,reflect" --files "test-nexus.sh")"
+  assert_contains "${out}" "Extracted" || return 1
+  assert_contains "${out}" "pattern" || return 1
+
+  # Verify knowledge entry in db
+  local fact_in_db
+  fact_in_db="$(sqlite3 "${db}" "SELECT fact FROM knowledge WHERE source_task_id = 'T100';")"
+  assert_contains "${fact_in_db}" "Tests should seed SQLite directly" || return 1
+
+  # Verify event logged
+  local event_count
+  event_count="$(sqlite3 "${db}" "SELECT COUNT(*) FROM events WHERE event_type = 'knowledge_extracted' AND task_id = 'T100';")"
+  [[ "${event_count}" -ge 1 ]] || return 1
+
+  # Try extracting duplicate fact — should print "Skipped"
+  out="$("${reflect}" extract --task-id T100 --outcome success --fact "Tests should seed SQLite directly" --type pattern)"
+  assert_contains "${out}" "Skipped" || return 1
+}
+
+# ── Test 7: Reflect adapt ────────────────────────────────────
+
+test_reflect_adapt() {
+  local reflect="${TEST_NEXUS_ROOT}/scripts/nexus-reflect.sh"
+  local db="${TEST_NEXUS_ROOT}/nexus.db"
+  local today
+  today="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  local out
+
+  # Insert dispatch records with failure_type for today
+  sqlite3 "${db}" "INSERT INTO dispatches (id, timestamp, task_id, mode, model, backend, duration_seconds, exit_code, failure_type) VALUES ('d-adapt-1', '${today}', 'T200', 'worker', 'gpt-5.3-codex', 'shell', 10, 1, 'timeout');"
+  sqlite3 "${db}" "INSERT INTO dispatches (id, timestamp, task_id, mode, model, backend, duration_seconds, exit_code, failure_type) VALUES ('d-adapt-2', '${today}', 'T201', 'worker', 'gpt-5.3-codex', 'shell', 10, 1, 'timeout');"
+  sqlite3 "${db}" "INSERT INTO dispatches (id, timestamp, task_id, mode, model, backend, duration_seconds, exit_code, failure_type) VALUES ('d-adapt-3', '${today}', 'T202', 'worker', 'gpt-5.3-codex', 'shell', 10, 1, 'env_missing');"
+
+  out="$("${reflect}" adapt)"
+
+  assert_contains "${out}" "Adaptation Check" || return 1
+  # Should suggest adaptations for timeout (2) and env_missing (1)
+  assert_contains "${out}" "timeout" || return 1
+  assert_contains "${out}" "env_missing" || return 1
+}
+
+# ── Test 8: Reflect retro ────────────────────────────────────
+
+test_reflect_retro() {
+  local reflect="${TEST_NEXUS_ROOT}/scripts/nexus-reflect.sh"
+  local db="${TEST_NEXUS_ROOT}/nexus.db"
+  local today
+  today="$(date -u +"%Y-%m-%d")"
+  local now
+  now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  local out
+
+  # Insert a completed task for today
+  sqlite3 "${db}" "INSERT OR IGNORE INTO tasks (id, title, description, assignee, priority, status, mode, retry_count, depends, notes, created_at, completed_at) VALUES ('T300', 'Retro task', 'For retro test', 'codex', 1, 'done', 'worker', 0, '[]', '[]', '${now}', '${now}');"
+
+  # Insert a dispatch for today
+  sqlite3 "${db}" "INSERT INTO dispatches (id, timestamp, task_id, mode, model, backend, duration_seconds, exit_code) VALUES ('d-retro-1', '${now}', 'T300', 'worker', 'gpt-5.3-codex', 'shell', 15, 0);"
+
+  # Insert a knowledge entry for today
+  sqlite3 "${db}" "INSERT INTO knowledge (id, type, fact, recommendation, confidence, source, tags, files, created_at) VALUES ('k_retro', 'pattern', 'Retro test fact', '', 'medium', 'claude', '[]', '[]', '${now}');"
+
+  out="$("${reflect}" retro)"
+
+  assert_contains "${out}" "Tasks completed" || return 1
+  assert_contains "${out}" "Dispatches" || return 1
+  assert_contains "${out}" "Knowledge added" || return 1
+  assert_contains "${out}" "Routing effectiveness" || return 1
+}
+
+# ── Main ──────────────────────────────────────────────────────
 
 main() {
   setup_test_env
 
-  run_test "nexus-board: add/list/update/show/summary/note/retry" test_board_flow
-  run_test "nexus-knowledge: add/search/prime/stats" test_knowledge_flow
-  run_test "nexus-dispatch: dry-run includes project context" test_dispatch_dry_run
-  run_test "nexus-status: runs without error" test_status_runs
+  run_test "test_db_init: schema creates all 5 tables" test_db_init
+  run_test "test_board_flow: add/list/update/show/note/retry/done/summary" test_board_flow
+  run_test "test_knowledge_flow: add/search/prime/stats" test_knowledge_flow
+  run_test "test_dispatch_dry_run: enriched prompt with SQLite knowledge" test_dispatch_dry_run
+  run_test "test_status_runs: dashboard sections present" test_status_runs
+  run_test "test_reflect_extract: knowledge extraction + dedup" test_reflect_extract
+  run_test "test_reflect_adapt: failure pattern adaptation" test_reflect_adapt
+  run_test "test_reflect_retro: session retrospective" test_reflect_retro
 
   echo ""
   echo "Tests complete: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
