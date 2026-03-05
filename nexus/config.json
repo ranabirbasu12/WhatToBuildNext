@@ -1,5 +1,7 @@
 {
   "codex": {
+    "dispatchBackend": "mcp",
+    "fallbackBackend": "shell",
     "model": "gpt-5.3-codex",
     "defaultMode": "worker",
     "fullAuto": true,

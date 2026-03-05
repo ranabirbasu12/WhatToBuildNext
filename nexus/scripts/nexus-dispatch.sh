@@ -89,6 +89,7 @@ fi
 
 MODEL="$(jq -r '.codex.model' "${CONFIG_FILE}")"
 TIMEOUT="$(jq -r '.codex.timeoutSeconds' "${CONFIG_FILE}")"
+DISPATCH_BACKEND="$(jq -r '.codex.dispatchBackend // "shell"' "${CONFIG_FILE}")"
 
 # ── Build context-enriched prompt ───────────────────────────
 ENRICHED_PROMPT=""
@@ -165,6 +166,7 @@ if [[ "${DRY_RUN}" == true ]]; then
   echo "── Configuration ──"
   echo "  Model:     ${MODEL}"
   echo "  Timeout:   ${TIMEOUT}s"
+  echo "  Backend:   ${DISPATCH_BACKEND}"
   echo "  Mode:      ${MODE}"
   echo "  Task ID:   ${TASK_ID}"
   echo "  Directory: ${DIR}"
@@ -178,6 +180,14 @@ if [[ "${DRY_RUN}" == true ]]; then
   echo "============================================"
   echo "Dry run complete. No execution performed."
   exit 0
+fi
+
+# ── MCP backend check ────────────────────────────────────────
+if [[ "${DISPATCH_BACKEND}" == "mcp" ]]; then
+  echo "NOTE: MCP dispatch backend is active."
+  echo "When run from Claude Code, Codex is called via MCP protocol natively."
+  echo "This script logs the dispatch and provides the enriched prompt."
+  echo "For standalone execution, falling back to shell backend."
 fi
 
 # ── Execute ─────────────────────────────────────────────────
