@@ -58,8 +58,8 @@ cmd_add() {
   esac
 
   # Validate priority
-  if [[ "$priority" -lt 1 || "$priority" -gt 5 ]] 2>/dev/null; then
-    echo "Error: --priority must be between 1 and 5." >&2
+  if ! [[ "$priority" =~ ^[0-9]+$ ]] || [[ "$priority" -lt 1 || "$priority" -gt 5 ]]; then
+    echo "Error: --priority must be a number between 1 and 5." >&2
     exit 1
   fi
 
@@ -82,11 +82,7 @@ cmd_add() {
     depends_json=$(echo "$depends" | jq -R 'split(",")')
   fi
 
-  # Build parent value
-  local parent_json="null"
-  if [[ -n "$parent" ]]; then
-    parent_json=$(printf '"%s"' "$parent")
-  fi
+  # Parent is handled via --arg in jq below
 
   local now
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -101,7 +97,7 @@ cmd_add() {
      --argjson priority "$priority" \
      --argjson depends "$depends_json" \
      --arg mode "$mode" \
-     --argjson parent "$parent_json" \
+     --arg parent "$parent" \
      --arg now "$now" \
      '.tasks += [{
        id: $id,
@@ -112,7 +108,7 @@ cmd_add() {
        status: "pending",
        depends: $depends,
        mode: $mode,
-       parent: $parent,
+       parent: (if $parent == "" then null else $parent end),
        reviewedBy: null,
        reviewStatus: "pending",
        retryCount: 0,
@@ -186,8 +182,6 @@ cmd_update() {
     esac
   fi
 
-  local tmp
-  tmp=$(mktemp)
   local now
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -230,6 +224,9 @@ cmd_update() {
   # Remove leading " | "
   updates="${updates# | }"
   filter="$filter $updates else . end]"
+
+  local tmp
+  tmp=$(mktemp)
 
   jq --arg id "$id" \
      --arg status "${status:-}" \

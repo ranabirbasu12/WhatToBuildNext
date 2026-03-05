@@ -20,6 +20,86 @@
       "subtasks": [],
       "createdAt": "2026-03-05T12:28:48Z",
       "completedAt": "2026-03-05T12:30:37Z"
+    },
+    {
+      "id": "T002",
+      "title": "Codex audits all Nexus bash scripts",
+      "description": "Full code audit of nexus-dispatch.sh, nexus-board.sh, nexus-knowledge.sh, nexus-status.sh. Look for bugs, edge cases, shellcheck issues, security concerns.",
+      "assignee": "codex",
+      "priority": 1,
+      "status": "done",
+      "depends": [],
+      "mode": "reviewer",
+      "parent": null,
+      "reviewedBy": "claude",
+      "reviewStatus": "approved",
+      "retryCount": 0,
+      "notes": [
+        "Codex found 15 issues: 10 IMPORTANT, 5 MINOR. Thorough audit — no shellcheck available but manual review was solid."
+      ],
+      "subtasks": [],
+      "createdAt": "2026-03-05T12:38:47Z",
+      "completedAt": "2026-03-05T12:43:15Z"
+    },
+    {
+      "id": "T003",
+      "title": "Fix issues found in Codex audit",
+      "description": "Apply fixes for any bugs or issues Codex finds in the bash scripts",
+      "assignee": "claude",
+      "priority": 1,
+      "status": "done",
+      "depends": [
+        "T002"
+      ],
+      "mode": "worker",
+      "parent": null,
+      "reviewedBy": "codex",
+      "reviewStatus": "approved",
+      "retryCount": 0,
+      "notes": [
+        "Fixed 8 of 15 issues: jq injection, priority validation, parent JSON, git HEAD guard, codex check, atomic writes, mkdir, temp leak. Remaining 7 are minor/defensive."
+      ],
+      "subtasks": [],
+      "createdAt": "2026-03-05T12:38:47Z",
+      "completedAt": "2026-03-05T12:45:07Z"
+    },
+    {
+      "id": "T004",
+      "title": "Codex builds integration test script",
+      "description": "Create nexus/tests/test-nexus.sh — automated test suite for board, knowledge, dispatch (dry-run), and status scripts",
+      "assignee": "codex",
+      "priority": 2,
+      "status": "pending",
+      "depends": [
+        "T003"
+      ],
+      "mode": "worker",
+      "parent": null,
+      "reviewedBy": null,
+      "reviewStatus": "pending",
+      "retryCount": 0,
+      "notes": [],
+      "subtasks": [],
+      "createdAt": "2026-03-05T12:38:47Z",
+      "completedAt": null
+    },
+    {
+      "id": "T005",
+      "title": "Update project-state.md with v0.1 learnings",
+      "description": "Update the living doc with architecture, known issues, and integration test findings",
+      "assignee": "claude",
+      "priority": 2,
+      "status": "pending",
+      "depends": [],
+      "mode": "worker",
+      "parent": null,
+      "reviewedBy": null,
+      "reviewStatus": "pending",
+      "retryCount": 0,
+      "notes": [],
+      "subtasks": [],
+      "createdAt": "2026-03-05T12:38:47Z",
+      "completedAt": null
     }
   ]
 }

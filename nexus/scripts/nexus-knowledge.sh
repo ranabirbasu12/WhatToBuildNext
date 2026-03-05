@@ -164,7 +164,7 @@ cmd_search() {
   local filter="."
 
   if [ -n "$type" ]; then
-    filter="${filter} | select(.type == \"${type}\")"
+    filter="${filter} | select(.type == \$type_filter)"
   fi
 
   if [ -n "$tags" ]; then
@@ -173,7 +173,7 @@ cmd_search() {
     filter="${filter} | select((.tags // []) as \$t | ${tags_json} | any(. as \$s | \$t | index(\$s) != null))"
   fi
 
-  jq "$filter" "$KB_FILE"
+  jq --arg type_filter "${type:-}" "$filter" "$KB_FILE"
 }
 
 cmd_prime() {

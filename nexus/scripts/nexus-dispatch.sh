@@ -71,6 +71,14 @@ if [[ -z "${PROMPT}" ]]; then
   echo "Error: --prompt is required" >&2; usage
 fi
 
+# ── Check required tools ───────────────────────────────────
+if ! command -v jq &>/dev/null; then
+  echo "Error: jq is required but not installed." >&2; exit 1
+fi
+if ! command -v codex &>/dev/null; then
+  echo "Error: codex CLI is required but not installed." >&2; exit 1
+fi
+
 # ── Read config ─────────────────────────────────────────────
 CONFIG_FILE="${NEXUS_ROOT}/config.json"
 if [[ ! -f "${CONFIG_FILE}" ]]; then
@@ -127,6 +135,9 @@ Report the following when done:
 2. List any issues encountered or decisions made
 3. Confirm task completion status
 "
+
+# ── Ensure log directories exist ───────────────────────────
+mkdir -p "${NEXUS_ROOT}/logs"
 
 # ── Determine output file ──────────────────────────────────
 if [[ -z "${OUTPUT_FILE}" ]]; then
@@ -186,8 +197,8 @@ DURATION=$(( END_TS - START_TS ))
 
 # ── Detect changed files ───────────────────────────────────
 FILES_CHANGED="[]"
-if command -v git &>/dev/null && git -C "${DIR}" rev-parse --git-dir &>/dev/null; then
-  FILES_CHANGED="$(git -C "${DIR}" diff --name-only HEAD 2>/dev/null | jq -R -s 'split("\n") | map(select(length > 0))')"
+if command -v git &>/dev/null && git -C "${DIR}" rev-parse --git-dir &>/dev/null && git -C "${DIR}" rev-parse --verify HEAD &>/dev/null; then
+  FILES_CHANGED="$(git -C "${DIR}" diff --name-only HEAD 2>/dev/null | jq -R -s 'split("\n") | map(select(length > 0))')" || FILES_CHANGED="[]"
 fi
 
 # ── Log to dispatches.jsonl ─────────────────────────────────
@@ -255,7 +266,8 @@ UPDATED_USAGE="$(jq \
   ' "${USAGE_FILE}"
 )"
 
-echo "${UPDATED_USAGE}" > "${USAGE_FILE}"
+USAGE_TMP="$(mktemp "${NEXUS_ROOT}/logs/.usage.json.XXXXXX")"
+echo "${UPDATED_USAGE}" > "${USAGE_TMP}" && mv "${USAGE_TMP}" "${USAGE_FILE}"
 
 # ── Summary ─────────────────────────────────────────────────
 echo ""

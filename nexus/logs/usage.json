@@ -1,17 +1,18 @@
 {
-  "total_dispatches": 1,
-  "total_duration_seconds": 27,
+  "total_dispatches": 2,
+  "total_duration_seconds": 249,
   "by_mode": {
-    "worker": 1
+    "worker": 1,
+    "reviewer": 1
   },
   "by_model": {
-    "gpt-5.3-codex": 1
+    "gpt-5.3-codex": 2
   },
   "session_history": [
     {
       "date": "2026-03-05",
-      "dispatches": 1,
-      "duration_seconds": 27
+      "dispatches": 2,
+      "duration_seconds": 249
     }
   ]
 }
