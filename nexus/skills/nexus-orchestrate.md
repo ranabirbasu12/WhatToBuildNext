@@ -26,6 +26,7 @@ When a task comes in, decide WHO handles it:
 | Design decision or architectural crossroads | **Escalate to Human** | Their intuition matters |
 | High-risk change (security, schema, infra) | **Both agents independently** | Compare, then present to human |
 | Agent disagreement on approach | **Escalate to Human** | Present both perspectives |
+| Codex available as MCP server | **MCP dispatch** | Native protocol, structured results |
 
 ### Quick Decision Heuristic
 
@@ -37,6 +38,8 @@ Ask yourself:
 5. Could this go wrong in a hard-to-reverse way? → **Escalate to Human first**
 
 ## The Execution Loop
+
+> **v0.2 Note:** Codex is registered as an MCP server. When running inside Claude Code, prefer calling Codex via MCP tools natively. The dispatch script remains available as a shell fallback and for context injection/logging.
 
 Every significant task follows this cycle:
 
@@ -146,6 +149,28 @@ Based on review results:
 ```
 Then tell the human:
 > "I've tried 3 times to resolve [task]. Here's what's happening: [issue]. Codex's perspective: [X]. My perspective: [Y]. I recommend [Z]. What would you like to do?"
+
+### REFLECT
+After every task completion, extract learnings:
+
+```bash
+# Extract knowledge from the task
+./nexus/scripts/nexus-reflect.sh extract \
+  --task-id T001 \
+  --outcome success \
+  --fact "What was learned" \
+  --rec "What to do next time" \
+  --type pattern \
+  --tags "relevant,tags"
+
+# Check if failure patterns suggest adaptations
+./nexus/scripts/nexus-reflect.sh adapt
+
+# At session end, generate retrospective
+./nexus/scripts/nexus-reflect.sh retro
+```
+
+The reflect stage is **mandatory** — skip it only for trivial tasks with no learnings.
 
 ## Presenting Status to the Human
 

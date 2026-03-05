@@ -111,3 +111,29 @@ Or if changes needed:
   --review-status changes_requested \
   --note "Review: missing null check in auth middleware line 42, no test for expired tokens"
 ```
+
+## Post-Review Reflection
+
+After every review (by either agent), extract learnings:
+
+```bash
+# If review found issues
+./nexus/scripts/nexus-reflect.sh extract \
+  --task-id T001 \
+  --outcome retry \
+  --fact "Review found: [specific issue]" \
+  --rec "Check for [issue type] before submitting" \
+  --type gotcha \
+  --tags "review,quality"
+
+# If review was clean
+./nexus/scripts/nexus-reflect.sh extract \
+  --task-id T001 \
+  --outcome success \
+  --fact "Clean review — [what went right]" \
+  --rec "Continue using [approach]" \
+  --type pattern \
+  --tags "review,quality"
+```
+
+This is how Nexus learns from reviews over time.

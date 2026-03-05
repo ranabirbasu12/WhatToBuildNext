@@ -17,7 +17,7 @@ cat nexus/context/project-state.md
 # 2. Read conventions
 cat nexus/context/conventions.md
 
-# 3. Load relevant knowledge (filter by tags related to the task)
+# 3. Load relevant knowledge (now from SQLite, filters expired entries)
 ./nexus/scripts/nexus-knowledge.sh prime --tags "relevant,tags"
 
 # 4. Check the task board for context
@@ -106,6 +106,16 @@ Periodically review the knowledge base:
 ```
 
 If entries become outdated or wrong, the knowledge.jsonl file can be edited directly (it's just newline-delimited JSON).
+
+### Knowledge Expiry
+
+Knowledge entries expire after 90 days by default. To clean up expired entries:
+
+```bash
+./nexus/scripts/nexus-knowledge.sh expire
+```
+
+To check what's expiring soon, use the reflect retro command which shows entries expiring within 7 days.
 
 ## Maintaining Conventions
 
