@@ -41,6 +41,7 @@ setup_test_env() {
   TEST_NEXUS_ROOT="${TMP_ROOT}/nexus"
 
   mkdir -p "${TEST_NEXUS_ROOT}/scripts" \
+           "${TEST_NEXUS_ROOT}/hooks" \
            "${TEST_NEXUS_ROOT}/context" \
            "${TEST_NEXUS_ROOT}/logs" \
            "${TMP_ROOT}/bin" \
@@ -49,6 +50,13 @@ setup_test_env() {
   # Copy scripts
   cp "${SOURCE_SCRIPTS_DIR}"/*.sh "${TEST_NEXUS_ROOT}/scripts/"
   chmod +x "${TEST_NEXUS_ROOT}/scripts/"*.sh
+
+  # Copy hooks
+  local hooks_dir="$(cd "${TEST_DIR}/../hooks" && pwd 2>/dev/null)" || true
+  if [[ -d "${hooks_dir}" ]]; then
+    cp "${hooks_dir}"/*.sh "${TEST_NEXUS_ROOT}/hooks/" 2>/dev/null || true
+    chmod +x "${TEST_NEXUS_ROOT}/hooks/"*.sh 2>/dev/null || true
+  fi
 
   # Copy schema and initialize SQLite db
   cp "${SOURCE_SCHEMA}" "${TEST_NEXUS_ROOT}/schema.sql"
@@ -301,11 +309,58 @@ test_reflect_retro() {
   assert_contains "${out}" "Routing effectiveness" || return 1
 }
 
+# ── v0.3 Tests ──────────────────────────────────────────────
+
+test_v03_hook_exists() {
+  local hook="${TEST_NEXUS_ROOT}/hooks/post-commit-knowledge.sh"
+  [[ -f "${hook}" ]] || return 1
+  [[ -x "${hook}" ]] || return 1
+
+  # Should output NEXUS KNOWLEDGE CAPTURE marker (may show 'unknown' for git info)
+  local out
+  out="$(bash "${hook}" 2>&1)" || true
+  assert_contains "${out}" "NEXUS KNOWLEDGE CAPTURE" || return 1
+}
+
+test_v03_session_start() {
+  local script="${TEST_NEXUS_ROOT}/scripts/nexus-session-start.sh"
+  local out
+  out="$(bash "${script}" 2>&1)"
+  [[ $? -eq 0 ]] || return 1
+  # Should produce output (either "Ready to work" or task listing)
+  [[ -n "${out}" ]] || return 1
+}
+
+test_v03_memory_sync() {
+  local script="${TEST_NEXUS_ROOT}/scripts/nexus-memory-sync.sh"
+  local out
+  out="$(bash "${script}" stats 2>&1)"
+  assert_contains "${out}" "Total active" || assert_contains "${out}" "Knowledge Base Stats" || return 1
+}
+
+test_v03_config_reviewer_default() {
+  # Check the real config (not the test fixture)
+  local real_config
+  real_config="$(cd "${TEST_DIR}/../.." && pwd)/nexus/config.json"
+  if [[ -f "${real_config}" ]]; then
+    local mode
+    mode="$(python3 -c "import json; print(json.load(open('${real_config}'))['codex']['defaultMode'])")"
+    [[ "${mode}" == "reviewer" ]] || return 1
+  fi
+}
+
+test_v03_claude_md_session_start() {
+  local claude_md
+  claude_md="$(cd "${TEST_DIR}/../.." && pwd)/CLAUDE.md"
+  grep -q "nexus-session-start.sh" "${claude_md}" || return 1
+}
+
 # ── Main ──────────────────────────────────────────────────────
 
 main() {
   setup_test_env
 
+  # v0.2 tests
   run_test "test_db_init: schema creates all 5 tables" test_db_init
   run_test "test_board_flow: add/list/update/show/note/retry/done/summary" test_board_flow
   run_test "test_knowledge_flow: add/search/prime/stats" test_knowledge_flow
@@ -314,6 +369,13 @@ main() {
   run_test "test_reflect_extract: knowledge extraction + dedup" test_reflect_extract
   run_test "test_reflect_adapt: failure pattern adaptation" test_reflect_adapt
   run_test "test_reflect_retro: session retrospective" test_reflect_retro
+
+  # v0.3 tests
+  run_test "test_v03_hook_exists: post-commit hook exists and outputs marker" test_v03_hook_exists
+  run_test "test_v03_session_start: session-start script runs" test_v03_session_start
+  run_test "test_v03_memory_sync: memory-sync stats runs" test_v03_memory_sync
+  run_test "test_v03_config_reviewer_default: config has reviewer as default" test_v03_config_reviewer_default
+  run_test "test_v03_claude_md_session_start: CLAUDE.md references session-start" test_v03_claude_md_session_start
 
   echo ""
   echo "Tests complete: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
