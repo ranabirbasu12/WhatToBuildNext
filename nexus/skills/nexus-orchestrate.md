@@ -1,202 +1,116 @@
-# Nexus Orchestrate — Core Dispatch & Routing Skill
+# Nexus Orchestrate v0.3 — Frictionless Multi-Agent Workflow
 
 ## Overview
 
-You are Claude Code running with Nexus — a multi-agent orchestration system. You have Codex CLI available as a sub-agent. This skill teaches you when and how to dispatch work to Codex, how to manage the execution loop, and when to escalate to the human.
+You are Claude Code running with Nexus. Codex CLI is available as an adversarial reviewer. This skill teaches you how to work naturally while Nexus captures knowledge, tracks tasks, and surfaces relevant context automatically.
+
+**v0.3 philosophy:** Don't context-switch to use Nexus. Nexus works through you, not alongside you.
 
 ## The Golden Rules
 
-1. **Verify, never trust** — After any agent completes work, YOU run the tests/checks independently. Never accept "tests pass" at face value.
-2. **Knowledge compounds** — Before dispatching, prime with relevant knowledge. After completing, extract learnings.
-3. **Escalate, don't loop** — 3 retries max. Then escalate to the human with full context.
-4. **Context is everything** — Every Codex dispatch gets project context, conventions, and relevant knowledge injected.
+1. **Verify, never trust** — independently validate all agent work
+2. **Knowledge compounds** — extract learnings after every significant commit
+3. **Reflect, don't forget** — the post-commit hook reminds you; follow through
+4. **Escalate, don't loop** — 3 retries max, then ask the human
+5. **Codex reviews, Claude builds** — use Codex for adversarial review, not grunt work
 
-## Routing Decision Matrix
+## Session Start
 
-When a task comes in, decide WHO handles it:
+At conversation start, run:
+```bash
+./nexus/scripts/nexus-session-start.sh
+```
+
+If pending tasks exist, acknowledge them. If knowledge is expiring, decide: promote to `conventions.md` or let expire.
+
+## Routing Decision Matrix (v0.3)
 
 | Signal | Route To | Why |
 |---|---|---|
-| Requires planning, architecture, or design | **You (Claude)** | Deep reasoning is your strength |
-| Well-defined implementation with clear spec | **Codex Worker** | Fast, cheap, follows specs well |
-| Complex feature that can be decomposed | **Codex Sub-Conductor** | Spawns its own parallel agents |
-| Code audit, security review, bug hunting | **Codex Reviewer** | Systematic, thorough audits |
-| Needs MCP tools (Supabase, Vercel, Playwright) | **You (Claude)** | Only you have MCP access |
-| Research, codebase exploration | **Claude Subagent** | Parallel research synthesis |
-| Design decision or architectural crossroads | **Escalate to Human** | Their intuition matters |
-| High-risk change (security, schema, infra) | **Both agents independently** | Compare, then present to human |
-| Agent disagreement on approach | **Escalate to Human** | Present both perspectives |
-| Codex available as MCP server | **MCP dispatch** | Native protocol, structured results |
+| Any implementation work | **You (Claude)** | You have full tool access, context, subagents |
+| Codebase scanning/auditing | **Claude Explore subagents** | Faster, better context than Codex |
+| Code review of YOUR work | **Codex Reviewer** | Different model = different perspective |
+| Security audit | **Codex Reviewer** | Systematic, adversarial review |
+| "What did I miss?" checks | **Codex Reviewer** | Fresh eyes on your changes |
+| Design decisions | **Escalate to Human** | Their intuition matters |
+| High-risk changes | **You + Codex review** | Build it, then get adversarial review |
 
 ### Quick Decision Heuristic
 
-Ask yourself:
-1. Does this need deep reasoning or planning? → **You handle it**
-2. Is this a clear "do X in file Y" task? → **Codex Worker**
-3. Does this touch multiple systems or need MCP? → **You handle it**
-4. Is this "review/audit this code"? → **Codex Reviewer**
-5. Could this go wrong in a hard-to-reverse way? → **Escalate to Human first**
+1. Can you do this with your normal tools? → **You handle it**
+2. Is this done and needs a second opinion? → **Codex Reviewer**
+3. Is this a security/architecture concern? → **Escalate to Human first**
 
-## The Execution Loop
+## The Natural Workflow
 
-> **v0.2 Note:** Codex is registered as an MCP server. When running inside Claude Code, prefer calling Codex via MCP tools natively. The dispatch script remains available as a shell fallback and for context injection/logging.
+### BEFORE Starting Work
 
-Every significant task follows this cycle:
-
-### PRIME
 ```bash
-# Load relevant knowledge
-./nexus/scripts/nexus-knowledge.sh prime --tags "relevant,tags"
-
-# Read project state
-cat nexus/context/project-state.md
-
-# Read conventions
-cat nexus/context/conventions.md
+# Check for relevant prior knowledge
+sqlite3 nexus/nexus.db "SELECT fact, recommendation FROM knowledge WHERE (expires_at IS NULL OR expires_at > datetime('now')) ORDER BY created_at DESC LIMIT 5;"
 ```
 
-### PLAN
-- Break the work into tasks on the board
-- Identify dependencies between tasks
-- Assign each task (claude/codex/human)
-- Set priorities
-
+If the work relates to a specific domain, filter by tags:
 ```bash
-./nexus/scripts/nexus-board.sh add --title "Task name" --desc "Details" --assignee codex --mode worker
+sqlite3 nexus/nexus.db "SELECT fact, recommendation FROM knowledge WHERE (expires_at IS NULL OR expires_at > datetime('now')) AND EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value IN ('relevant','tag')) LIMIT 10;"
 ```
 
-### DISPATCH
-For Codex tasks, use the dispatch script:
+### DURING Work
 
+Work normally with your tools (Read, Edit, Write, Agent, Bash). Don't interrupt your flow for Nexus — the post-commit hook handles knowledge capture.
+
+For significant task tracking:
 ```bash
-# Worker mode — single well-defined task
-./nexus/scripts/nexus-dispatch.sh \
-  --mode worker \
-  --task-id T001 \
-  --prompt "Implement the JWT validation middleware in src/middleware/auth.ts. It should verify tokens from the Authorization header, extract user ID, and attach it to req.user. Return 401 for invalid/missing tokens." \
-  --dir /path/to/project
+# Quick task creation (only for multi-step work)
+sqlite3 nexus/nexus.db "INSERT INTO tasks (id, title, description, assignee, priority, status, mode, created_at) VALUES ((SELECT printf('T%03d', COALESCE(MAX(CAST(SUBSTR(id,2) AS INTEGER)),0)+1) FROM tasks), 'Title', 'Description', 'claude', 1, 'in_progress', 'worker', datetime('now'));"
+```
 
-# Reviewer mode — code audit
+### AFTER Each Commit
+
+The post-commit hook will prompt you. When you see `[NEXUS KNOWLEDGE CAPTURE]`:
+1. If the commit taught something reusable → write the knowledge entry
+2. If the commit was trivial → skip
+
+Write knowledge directly via SQLite (faster than the script):
+```bash
+sqlite3 nexus/nexus.db "INSERT INTO knowledge (id, type, fact, recommendation, confidence, source, tags, files, expires_at, created_at) VALUES ((SELECT printf('k_%03d', COALESCE(MAX(CAST(SUBSTR(id,3) AS INTEGER)),0)+1) FROM knowledge), 'pattern', 'What was learned', 'What to do next time', 'medium', 'claude', '[\"tag1\",\"tag2\"]', '[]', datetime('now', '+90 days'), datetime('now'));"
+```
+
+### AFTER Significant Milestones
+
+Send your work to Codex for adversarial review:
+```bash
 ./nexus/scripts/nexus-dispatch.sh \
   --mode reviewer \
-  --task-id T002 \
-  --prompt "Review src/middleware/auth.ts for: security vulnerabilities, edge cases, error handling, convention compliance. Report issues with file:line references." \
-  --dir /path/to/project
-
-# Sub-conductor mode — complex decomposable task
-./nexus/scripts/nexus-dispatch.sh \
-  --mode sub-conductor \
-  --task-id T003 \
-  --prompt "Build the complete user authentication system: registration, login, password reset, email verification. Decompose into subtasks and implement each." \
+  --task-id TXXX \
+  --prompt "Review the recent changes (git diff HEAD~N). Find: bugs, security issues, missed edge cases, convention violations. Be critical — find what I missed." \
   --dir /path/to/project
 ```
 
-For Claude tasks, handle directly using your normal tools (Read, Edit, Write, Bash, Agent subagents).
-
-### VALIDATE
-After Codex completes:
-1. Read the output file from the dispatch
-2. Check `git diff` to see what changed
-3. **Run tests yourself** — do NOT trust Codex's claim that tests pass
-4. Check for convention compliance
-5. Verify the task deliverables were met
-
-```bash
-# Check what Codex changed
-git diff --stat
-
-# Run tests independently
-npm test  # or whatever the project uses
-
-# Update task status
-./nexus/scripts/nexus-board.sh update --id T001 --status review
-```
-
-### ADVERSARIAL REVIEW
-The OTHER agent reviews the work:
-- If Codex did the work → You review for architectural coherence, big-picture issues
-- If You did the work → Send to Codex for review
-
-```bash
-# Send your work to Codex for review
-./nexus/scripts/nexus-dispatch.sh \
-  --mode reviewer \
-  --task-id T001-review \
-  --prompt "Review the recent changes (git diff HEAD~1). Check for: bugs, security issues, edge cases, test coverage gaps. Be critical." \
-  --dir /path/to/project
-```
-
-### RESOLVE
-Based on review results:
-
-**If approved:**
-```bash
-./nexus/scripts/nexus-board.sh update --id T001 --status done --reviewed-by codex --review-status approved
-# Extract learnings
-./nexus/scripts/nexus-knowledge.sh add --type pattern --fact "What we learned" --rec "What to do next time" --tags "relevant,tags"
-```
-
-**If changes needed (retry ≤ 3):**
-```bash
-./nexus/scripts/nexus-board.sh update --id T001 --retry
-# Re-dispatch with specific fix instructions
-./nexus/scripts/nexus-dispatch.sh --mode worker --task-id T001 --prompt "Fix: [specific issues found in review]" --dir /path
-```
-
-**If stuck (retry > 3):**
-```bash
-./nexus/scripts/nexus-board.sh update --id T001 --status escalated --note "Failed after 3 retries. Issue: [description]"
-```
-Then tell the human:
-> "I've tried 3 times to resolve [task]. Here's what's happening: [issue]. Codex's perspective: [X]. My perspective: [Y]. I recommend [Z]. What would you like to do?"
-
-### REFLECT
-After every task completion, extract learnings:
-
-```bash
-# Extract knowledge from the task
-./nexus/scripts/nexus-reflect.sh extract \
-  --task-id T001 \
-  --outcome success \
-  --fact "What was learned" \
-  --rec "What to do next time" \
-  --type pattern \
-  --tags "relevant,tags"
-
-# Check if failure patterns suggest adaptations
-./nexus/scripts/nexus-reflect.sh adapt
-
-# At session end, generate retrospective
-./nexus/scripts/nexus-reflect.sh retro
-```
-
-The reflect stage is **mandatory** — skip it only for trivial tasks with no learnings.
-
-## Presenting Status to the Human
-
-At natural milestones, show the board:
-```bash
-./nexus/scripts/nexus-status.sh
-```
-
-Or summarize verbally:
-> "3 tasks done, 2 in progress (Codex working on auth middleware, I'm reviewing the DB schema), 1 pending. Codex has used 4 dispatches today (180s total). No issues."
+Read the output, verify Codex's findings, fix real issues.
 
 ## When to Pull the Human In
 
 Always escalate for:
-- Architecture decisions ("Should we use microservices or monolith?")
-- Security boundaries ("This endpoint will be public-facing")
-- Schema changes ("Adding a new table to the database")
-- Agent disagreement ("Codex suggests X, I think Y is better")
+- Architecture decisions
+- Security boundaries
+- Schema changes
+- When you're unsure (trust your judgment)
 - Three failures on the same task
-- Anything that "feels wrong" — trust your judgment
+
+## Session End
+
+Before the conversation ends:
+```bash
+./nexus/scripts/nexus-reflect.sh retro
+```
+
+Review the retrospective. If MEMORY.md needs updating, update it. If conventions.md needs a new entry from today's learnings, add it.
 
 ## Anti-Patterns to Avoid
 
-- **Don't dispatch everything to Codex** — You're the brain, not just a dispatcher
-- **Don't skip the review step** — Every task gets reviewed by the other agent
-- **Don't retry silently** — If something fails, log it and consider escalating
-- **Don't dispatch without context** — Always use nexus-dispatch.sh which injects context
-- **Don't update project-state.md after every tiny change** — Update at milestones
-- **Don't forget to extract knowledge** — Every interesting finding goes in the knowledge base
+- **Don't use shell scripts when SQLite is faster** — `sqlite3 nexus/nexus.db "..."` is zero-friction
+- **Don't dispatch worker tasks to Codex** — your Explore subagents are faster and have better context
+- **Don't skip the post-commit knowledge prompt** — it's the core of v0.3
+- **Don't forget to send significant work to Codex for review** — the adversarial perspective finds real bugs
+- **Don't create tasks for every small fix** — only track multi-step work on the board

@@ -1,139 +1,73 @@
- # Nexus Review — Cross-Agent Review Skill
+# Nexus Review v0.3 — Codex as Adversarial Reviewer
 
 ## Overview
 
-Every piece of work in Nexus gets reviewed by the OTHER agent. Claude reviews Codex's work. Codex reviews Claude's work. This skill defines how.
+In v0.3, Codex's sole role is adversarial review. Claude builds, Codex finds what Claude missed. This is Codex's highest-value contribution — the battle test showed worker dispatches weren't better than Claude doing the work directly, but the audit dispatch (T002) found 15 real issues.
 
-## Why Cross-Review
+## When to Request Codex Review
 
-- Single-agent review has blind spots — the same model that wrote the code won't catch its own systematic errors
-- Claude excels at architectural coherence and big-picture issues
-- Codex excels at systematic bug hunting and edge case detection
-- Disagreements surface insights that neither agent would find alone
+**Always request review after:**
+- Completing a feature or significant refactor (5+ files changed)
+- Fixing a security-related bug
+- Changing database schema or API contracts
+- Any work touching authentication, authorization, or data handling
 
-## Review Workflows
+**Skip review for:**
+- Formatting/style-only changes
+- Adding comments or documentation
+- Single-file, low-risk changes
+- Changes already covered by passing tests
 
-### Claude Reviews Codex's Work
-
-After Codex completes a task:
-
-1. **Read the diff**: `git diff` or `git diff HEAD~1` to see exactly what changed
-2. **Check architectural coherence**: Does this fit the overall design? Does it follow patterns used elsewhere?
-3. **Check conventions**: Does it follow `nexus/context/conventions.md`?
-4. **Run tests independently**: Never trust that Codex ran them
-5. **Look for**:
-   - Architectural drift (doing things differently from the rest of the codebase)
-   - Missing error handling at system boundaries
-   - Security issues (injection, auth bypass, data exposure)
-   - Over-engineering or unnecessary complexity
-   - Missing tests for edge cases
-
-**Verdict format:**
-```
-REVIEW: [APPROVED | CHANGES_REQUESTED]
-Files reviewed: [list]
-Strengths: [what's good]
-Issues: [if any, with file:line references]
-Recommendation: [what to fix or "ready to merge"]
-```
-
-### Codex Reviews Claude's Work
-
-After Claude completes a task, dispatch a review:
+## How to Dispatch a Review
 
 ```bash
 ./nexus/scripts/nexus-dispatch.sh \
   --mode reviewer \
   --task-id TXXX-review \
-  --prompt "Review the changes in the last commit (git diff HEAD~1). Focus on:
+  --prompt "Review the recent changes (git diff HEAD~N). Check for:
 1. Bugs and logic errors
-2. Edge cases not handled
-3. Security vulnerabilities
-4. Test coverage gaps
-5. Convention violations (see CONVENTIONS section above)
-
-For each issue found, provide:
-- Severity: critical / important / minor
-- File and line number
-- What's wrong
-- Suggested fix
-
-If no issues found, say APPROVED." \
+2. Security vulnerabilities (OWASP top 10)
+3. Edge cases and error handling gaps
+4. Convention violations
+5. What would you do differently?
+Be adversarial — your job is to find what I missed." \
   --dir /path/to/project
 ```
 
-### Disagreement Resolution
+## Interpreting Review Results
 
-When Claude and Codex disagree:
+After Codex returns:
 
-1. **Document both perspectives clearly**
-2. **Present to human with your recommendation**:
-   > "Codex suggests [X] because [reasons]. I think [Y] because [reasons]. I recommend [your pick] because [why]. What do you think?"
-3. **Log the decision** in knowledge base regardless of outcome
-
+1. **Read the output file** from `nexus/logs/output-TXXX-review-*.md`
+2. **Triage each finding:**
+   - Real issue → fix it, log knowledge entry
+   - False positive → note why in the task
+   - Style disagreement → follow conventions.md, ignore if not covered
+3. **Log the review result:**
 ```bash
-./nexus/scripts/nexus-knowledge.sh add \
-  --type decision \
-  --fact "Chose X over Y for [reason]" \
-  --rec "Use X pattern for similar situations" \
-  --tags "architecture,review" \
-  --source human
+sqlite3 nexus/nexus.db "UPDATE dispatches SET reviewed_by = 'codex', review_result = 'approved' WHERE task_id = 'TXXX-review';"
 ```
 
-## Review Checklist
+## Three Review Templates
 
-For any code review (by either agent), check:
-
-- [ ] Does it do what the task asked for? (spec compliance)
-- [ ] Are there tests? Do they cover the happy path AND edge cases?
-- [ ] Does it follow project conventions?
-- [ ] Are there security concerns?
-- [ ] Is it simple? Could it be simpler?
-- [ ] Does it handle errors at system boundaries?
-- [ ] Will it break anything else? (integration concerns)
-
-## Logging Reviews
-
-After every review:
-```bash
-./nexus/scripts/nexus-board.sh update \
-  --id T001 \
-  --reviewed-by claude \
-  --review-status approved \
-  --note "Review: clean implementation, good test coverage, no issues"
+### 1. Post-Feature Review
+```
+Review git diff HEAD~N. I just implemented [feature]. Find bugs, edge cases, and security issues I missed. Be critical.
 ```
 
-Or if changes needed:
-```bash
-./nexus/scripts/nexus-board.sh update \
-  --id T001 \
-  --reviewed-by claude \
-  --review-status changes_requested \
-  --note "Review: missing null check in auth middleware line 42, no test for expired tokens"
+### 2. Security Audit
+```
+Security audit of [files/area]. Check for: injection (SQL, command, XSS), authentication bypass, authorization gaps, sensitive data exposure, insecure defaults. Reference OWASP top 10.
 ```
 
-## Post-Review Reflection
-
-After every review (by either agent), extract learnings:
-
-```bash
-# If review found issues
-./nexus/scripts/nexus-reflect.sh extract \
-  --task-id T001 \
-  --outcome retry \
-  --fact "Review found: [specific issue]" \
-  --rec "Check for [issue type] before submitting" \
-  --type gotcha \
-  --tags "review,quality"
-
-# If review was clean
-./nexus/scripts/nexus-reflect.sh extract \
-  --task-id T001 \
-  --outcome success \
-  --fact "Clean review — [what went right]" \
-  --rec "Continue using [approach]" \
-  --type pattern \
-  --tags "review,quality"
+### 3. Architecture Review
+```
+I designed [system] using [approach]. Here's the architecture: [summary]. What would you do differently? What assumptions am I making that could bite us later?
 ```
 
-This is how Nexus learns from reviews over time.
+## Anti-Patterns
+
+- **Don't use Codex as a worker** — Claude's Explore subagents are faster with better context
+- **Don't skip review for significant changes** — Codex finds real issues (15 in v0.1 audit)
+- **Don't blindly accept all findings** — triage each one, Codex has false positives
+- **Don't retry reviews** — if Codex's review is unhelpful, just move on (it's advisory)
