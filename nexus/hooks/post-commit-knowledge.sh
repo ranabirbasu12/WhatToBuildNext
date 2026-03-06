@@ -22,10 +22,10 @@ Files changed:
 $CHANGED_FILES
 
 Claude: Review this commit. If it contains a reusable learning (pattern, gotcha,
-convention, or decision), capture it with:
+decision, or anti-pattern), capture it with:
 
-sqlite3 "$DB_PATH" "INSERT INTO knowledge (type, fact, recommendation, confidence, source, tags, files) VALUES ('<pattern|gotcha|convention|decision>', '<what happened>', '<what to do next time>', <0.0-1.0>, 'commit:$COMMIT_HASH', '<comma,separated,tags>', '<relevant,files>');"
+sqlite3 "$DB_PATH" "INSERT INTO knowledge (id, type, fact, recommendation, confidence, source, tags, files, expires_at, created_at) VALUES ((SELECT printf('k_%03d', COALESCE(MAX(CAST(SUBSTR(id,3) AS INTEGER)),0)+1) FROM knowledge), '<pattern|gotcha|decision|anti-pattern>', '<what was learned>', '<what to do next time>', 'medium', 'claude', '[\"tag1\",\"tag2\"]', '[]', datetime('now', '+90 days'), datetime('now'));"
 
-If this commit has no reusable learning, skip this step.
+If this commit has no reusable learning (trivial fix, formatting), skip.
 
 EOF
