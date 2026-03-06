@@ -3,7 +3,7 @@
     "dispatchBackend": "mcp",
     "fallbackBackend": "shell",
     "model": "gpt-5.3-codex",
-    "defaultMode": "worker",
+    "defaultMode": "reviewer",
     "fullAuto": true,
     "multiAgent": true,
     "maxRetries": 3,
@@ -12,6 +12,13 @@
   "routing": {
     "autoDispatchThreshold": "medium",
     "alwaysReview": true,
+    "codexRole": "adversarial-reviewer",
+    "reviewTriggers": [
+      "feature_complete",
+      "security_change",
+      "schema_change",
+      "multi_file_refactor"
+    ],
     "humanEscalationTriggers": [
       "architecture_decision",
       "security_boundary",
@@ -19,6 +26,12 @@
       "agent_disagreement",
       "three_failures"
     ]
+  },
+  "knowledge": {
+    "postCommitCapture": true,
+    "sessionStartSurface": true,
+    "defaultExpireDays": 90,
+    "promotionThreshold": 3
   },
   "tracking": {
     "logDispatches": true,
