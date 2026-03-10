@@ -2,7 +2,7 @@
 
 > AI skill swarm that turns Claude Code into a virtual deal team for private credit fund associates.
 
-## Status: DESIGNING
+## Status: BUILT — awaiting battle-test
 
 ## The Problem
 
@@ -20,24 +20,24 @@ The fund context: INR 100-800 Cr NCD facilities to mid-market Indian companies. 
 
 | # | Skill | What It Does |
 |---|-------|-------------|
-| 1 | **Screening Analyst** | Extracts financials from PDFs, builds the screening model, drafts the screening memo |
-| 2 | **Term Sheet Drafter** | Generates term sheet from screening output and fund covenants |
-| 3 | **Due Diligence Coordinator** | Structures DD checklist, tracks document collection, flags gaps |
-| 4 | **Financial Model Builder** | Builds/updates the credit model (debt serviceability, cash flow waterfall) |
-| 5 | **Legal Review Analyst** | Reviews transaction documents against term sheet, flags deviations |
-| 6 | **IC Memo Writer** | Assembles the Investment Committee memo from all prior outputs |
-| 7 | **Comparables Analyst** | Pulls peer/sector benchmarks for credit metrics |
-| 8 | **Deal Tracker** | Maintains pipeline view across all active deals |
+| 1 | **Screening Analyst** | Extracts financials from messy PDFs, builds 3-statement model, validates and scores the lead |
+| 2 | **Industry Analyst** | Credit-oriented industry notes — answers whether the sector supports reliable debt repayment |
+| 3 | **Concept Paper Writer** | 14-16 slide IC deck for go/no-go decision on committing DD spend |
+| 4 | **HoT Analyst** | Drafts, redlines, and tracks Head of Terms through 5-13 negotiation rounds |
+| 5 | **DD Coordinator** | Manages 7 parallel DD workstreams, generates IRL, coordinates external vendors |
+| 6 | **Model Builder** | 30-50 sheet credit model — debt serviceability, covenants, stress scenarios |
+| 7 | **FDIR Writer** | 40-60 page IC memo synthesizing all deal work for final investment decision |
+| 8 | **Call Note Taker** | Structured notes from management calls, expert calls, site visits |
 
 #### Screening Analyst Sub-Skills (where 80% of grunt work lives)
 
 | Sub-Skill | What It Does |
 |-----------|-------------|
-| PDF Extractor | Pulls structured financials from messy Indian PDF annual reports |
-| Ratio Engine | Computes credit ratios (DSCR, ICR, leverage, liquidity) from extracted data |
-| Red Flag Scanner | Flags audit qualifications, related-party concerns, cash flow mismatches |
-| Screening Memo Drafter | Writes the narrative memo in fund house format |
-| Sector Primer | Generates sector context (market size, cyclicality, regulatory landscape) |
+| Document Ingestion | Parses scanned/messy Indian PDF annual reports, OCR, table extraction, notes-to-accounts |
+| Financial Statement Builder | Maps extracted data to BPEA template, builds formula-linked 3-statement model |
+| Ratio Engine | Computes 25+ credit ratios (DSCR, ISCR, leverage, liquidity) with peer benchmarking |
+| Red Flag Scanner | 12-category severity matrix — audit qualifications, related-party, cash flow mismatches |
+| Lead Scorer | 22-dimension scorecard with Go/Maybe/Kill framework for senior handoff |
 
 ## What's NOT Included
 
@@ -88,7 +88,7 @@ Skills are modeled on actual deliverables, not theoretical templates.
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Spar | Brainstorm, validate the idea | Done |
-| Design | Skill tree, sub-skill architecture | In progress |
-| Prototype | Build Screening Analyst (deepest pain) | Not started |
-| Battle-test | Run on a real pipeline deal | Not started |
-| Ship | Full 8-skill swarm | Not started |
+| Design | Skill tree, sub-skill architecture | Done |
+| Build | Write all 13 skill files (8 skills, 5 sub-skills) | Done |
+| Battle-test | Run on a real deal file from Ascertis Credit | Not started |
+| Iterate | Refine skills based on real-world output quality | Not started |
