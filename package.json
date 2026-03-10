@@ -1,0 +1,11 @@
+{
+  "name": "what-to-build-next",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "ideas/*"
+  ],
+  "devDependencies": {
+    "turbo": "^2.8.15"
+  }
+}

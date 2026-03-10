@@ -1,2 +1,6 @@
+node_modules/
+.turbo/
+dist/
 .DS_Store
-nexus/*.db
+*.db
+*.db-journal

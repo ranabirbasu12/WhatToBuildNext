@@ -1,0 +1,11 @@
+{
+  "name": "@ideas/IDEA_NAME",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ONE_LINE_DESCRIPTION",
+  "scripts": {
+    "build": "echo 'No build step yet'",
+    "test": "echo 'No tests yet'",
+    "dev": "echo 'No dev server yet'"
+  }
+}

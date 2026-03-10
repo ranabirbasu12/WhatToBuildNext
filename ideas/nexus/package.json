@@ -1,0 +1,6 @@
+{
+  "name": "@ideas/nexus",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Multi-agent orchestration system (Claude Code + Codex CLI). Archived — superseded by GSD and Metaswarm plugins."
+}

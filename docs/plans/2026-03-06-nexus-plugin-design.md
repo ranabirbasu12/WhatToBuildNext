@@ -13,7 +13,7 @@ Package Nexus as a Claude Code plugin distributed via GitHub. Hybrid data model:
 ### Plugin Layout
 
 ```
-nexus-plugin/                        # GitHub repo: ranabirbasu/nexus-plugin
+nexus-plugin/                        # GitHub repo: ranabirbasu12/nexus-plugin
 ├── .claude-plugin/
 │   └── plugin.json                  # Manifest: name, version, description, author
 ├── skills/
@@ -169,7 +169,7 @@ Skills teach Claude *how to think* when Nexus is active:
 
 ### Installation
 
-**GitHub repo:** `ranabirbasu/nexus-plugin`
+**GitHub repo:** `ranabirbasu12/nexus-plugin`
 
 **Registration in `~/.claude/settings.json`:**
 ```json
@@ -178,7 +178,7 @@ Skills teach Claude *how to think* when Nexus is active:
     "nexus-marketplace": {
       "source": {
         "source": "github",
-        "repo": "ranabirbasu/nexus-plugin"
+        "repo": "ranabirbasu12/nexus-plugin"
       }
     }
   },
