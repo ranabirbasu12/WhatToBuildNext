@@ -60,7 +60,7 @@ For each pillar, construct this structure:
 - [Specific data point with source]
 - [Specific data point with source]
 
-**Source:** [Audited financials FY22-24 / Pitch book / MCA filing / GLG call / Management meeting]
+**Source:** [Must be a specific file + page citation, not just "Annual Report." Use: `[Source: <filename>, p.<page>, "<quoted text if key>"]`. E.g., `[Source: Audited Financials FY24, p.38, "Revenue CAGR 28%"]` or `[Source: GLG Call Transcript 12-Jan-2026, p.3]`]
 
 **Confidence:** [High / Medium / Low]
 - High = verified from audited financials or independent source

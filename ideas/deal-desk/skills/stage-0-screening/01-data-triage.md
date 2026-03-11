@@ -145,16 +145,17 @@ This is where deals get complicated. Indian promoter groups rarely have just one
 
 ### Entity Map Format
 
-Build a table like this:
+Build a table like this. **Every entity MUST include the source citation** — where in the documents you found it:
 
-| Entity | Short Name | CIN | Relationship | Ownership % | Financials Received? | Status |
-|--------|-----------|-----|-------------|-------------|---------------------|--------|
-| Omsairam Alloys Pvt Ltd | OSAPL | U27100MH2010PTC... | **Main borrower** | — | FY21, FY22, FY23 Stdl + Consol | Active |
-| Shri Alloys Pvt Ltd | SAPL | U27100MH2012PTC... | Subsidiary | 100% | FY22, FY23 Stdl only | Active |
-| Kapila Metals Trading LLP | Kapila | AAB-1234 | Group company (promoter interest) | N/A | None received | Active |
-| Sanvijay Rolling Mills Pvt Ltd | Sanvijay | U27100MH2015PTC... | Group company (common promoter) | N/A | None received | Active |
+| Entity | Short Name | CIN | Relationship | Ownership % | Financials Received? | Status | Source |
+|--------|-----------|-----|-------------|-------------|---------------------|--------|--------|
+| Omsairam Alloys Pvt Ltd | OSAPL | U27100MH2010PTC... | **Main borrower** | — | FY21, FY22, FY23 Stdl + Consol | Active | [Consol AR FY24, p.1, cover page] |
+| Shri Alloys Pvt Ltd | SAPL | U27100MH2012PTC... | Subsidiary | 100% | FY22, FY23 Stdl only | Active | [Consol AR FY24, p.6, Auditor's "Other Matter" para] |
+| Kapila Metals Trading LLP | Kapila | AAB-1234 | Group company (promoter interest) | N/A | None received | Active | [Related Party note, AR FY24, p.XX, Note YY] |
 
-**Why this matters**: Every entity that could be a borrower, guarantor, or co-obligor needs separate financials. If you miss a subsidiary at triage, you'll be chasing it 3 weeks later when the VP asks "where are SAPL's numbers?"
+**Every entity entry needs a source.** If you find an entity name in a file, cite the file, page, and the text/section where it appears. If the relationship or ownership % comes from a different page than the entity name, cite both.
+
+**Why this matters**: Every entity that could be a borrower, guarantor, or co-obligor needs separate financials. If you miss a subsidiary at triage, you'll be chasing it 3 weeks later when the VP asks "where are SAPL's numbers?" And if you list an entity that doesn't actually exist in the AR, you've wasted everyone's time chasing a phantom.
 
 ### Common Indian Group Structures to Watch For
 
@@ -204,7 +205,9 @@ Duplicates waste time and create version confusion. Check for:
 
 ## Step 6: Gap Identification
 
-Compare what you have against what you need. Standard checklist:
+Compare what you have against what you need. **For every gap, document what you searched.** Don't just say "CIBIL report not received" — say "Searched all 53 directories and 339 files; no file matching CIBIL, credit bureau, TransUnion, or Experian found." This proves the gap is real, not a search failure.
+
+Standard checklist:
 
 ### Must-Have for Screening (Priority 1)
 
@@ -298,6 +301,9 @@ Source Contact:     [Name, email, phone]
 6. PRELIMINARY OBSERVATIONS
    - [Anything notable from a quick skim: qualified audit opinion,
      auditor change, restated figures, related party red flags]
+   - **EVERY observation must cite source: [filename, page number, quoted text]**
+   - Example: "Subsidiary with Rs 643 Cr assets audited by different auditor
+     [Source: Consolidated AR 2023-24-ocr.pdf, p.6, 'total assets of Rs. 64,305.64 Lacs']"
 
 7. RECOMMENDED NEXT STEPS
    - Send IRL to [contact] by [date]

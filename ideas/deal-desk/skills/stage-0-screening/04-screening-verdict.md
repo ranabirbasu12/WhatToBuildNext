@@ -25,6 +25,8 @@ Each dimension gets a traffic light: **Green**, **Amber**, or **Red**.
 - **Amber**: Pass with caveats. Acceptable but needs monitoring or additional data.
 - **Red**: Deal-breaker on this dimension alone, unless exceptional circumstances exist.
 
+> **Source Citation Requirement:** Each dimension's traffic-light rating must cite the evidence source using the format `[Source: <filename>, p.<page>, "<quoted text if key>"]`. For example, Scale rated Green should cite `[Source: AR FY24, p.5, "Revenue: 612 Cr"]` and `[Source: Term Sheet v2, p.1, "Facility: 100 Cr"]`. Unsourced ratings will be challenged by IC.
+
 ### Decision Rule
 
 | Scorecard Profile | Decision | Rationale |

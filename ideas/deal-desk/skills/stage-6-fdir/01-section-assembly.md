@@ -232,6 +232,8 @@ Every CP risk now has DD evidence attached:
 
 ---
 
+> **Source Citation Requirement:** When FDIR sections pull data from prior stages, cite the ORIGINAL source document — not just the intermediate stage output. For example, write `[Source: Audited P&L FY24, p.22]` rather than "from screening model" or "per Working File." Use the format `[Source: <filename>, p.<page>, "<quoted text if key>"]`. The IC must be able to trace any number in the FDIR back to a primary document without re-reading Stage 0-5 outputs.
+
 ## Quality Checklist Before Submission
 
 - [ ] All sections present and in correct order

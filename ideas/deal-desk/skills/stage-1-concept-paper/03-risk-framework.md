@@ -120,7 +120,7 @@ For each identified risk (target 5-8 for the Concept Paper):
 [2-3 sentences explaining the risk in specific terms, not generic language]
 
 **Evidence:**
-[What data from screening supports this risk assessment?]
+[What data from screening supports this risk assessment? Cite specific sources using `[Source: <filename>, p.<page>, "<quoted text if key>"]` — e.g., `[Source: Working File v3, DSCR sheet, "Ascertis Case DSCR 1.1x FY27"]`]
 
 **Mitigant:**
 [What currently exists to offset this risk? Contractual protection, business moat, etc.]

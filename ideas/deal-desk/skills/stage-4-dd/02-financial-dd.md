@@ -22,6 +22,8 @@ Reported EBITDA
   (=) Adjusted EBITDA (Quality of Earnings EBITDA)
 ```
 
+> **Source Citation Requirement:** Every QoE adjustment, financial finding, and verified data point must cite the original document using `[Source: <filename>, p.<page>, "<quoted text if key>"]`. For example: `[Source: Audited BS FY24, p.12, Note 8, "Trade Receivables: 94.3 Cr"]` or `[Source: GST Returns FY24, GSTR-1 Mar-24, "Outward supplies: 48.2 Cr"]`. The DD report is an evidentiary document — unsourced findings will not survive IC scrutiny.
+
 ### Common Adjustments
 
 | Adjustment Type | What to Look For | Impact Direction |

@@ -13,6 +13,8 @@ The Working File is the ANALYTICAL layer on top of extracted financials. Raw fin
 
 This is NOT the final credit model — that gets built from scratch during DD. The Working File is a disposable screening tool. What survives is the knowledge you build, not the spreadsheet.
 
+> **Source Citation Requirement:** Every ratio, metric, and computed figure in the Working File must cite the source numbers it was derived from. Use the format `[Source: <filename>, p.<page>, "<quoted text if key>"]`. Example: DSCR inputs — EBITDA from `[Source: AR FY24, p.42, "EBITDA: 127 Cr"]`, Debt Service from `[Source: AR FY24, p.58, Note 18]`. This ensures the screening model is auditable even though it is disposable.
+
 ---
 
 ## Working File Architecture
